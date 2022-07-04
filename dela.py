@@ -1,11 +1,5 @@
-from asyncio.windows_events import NULL
-from dataclasses import dataclass
-from tkinter import CENTER
-from tkinter.messagebox import NO
 from typing import Tuple
-from xmlrpc.client import Boolean
 from matplotlib.axes import Axes
-from matplotlib.markers import MarkerStyle
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -14,10 +8,10 @@ Sphere = Tuple[np.matrix, float]
 
 class Tetrahedron:
     vert: np.matrix
-    o: np.matrix = NULL
-    M: np.matrix = NULL
-    iM: np.matrix = NULL
-    boundingSphere: Sphere = (NULL, NULL)
+    o: np.matrix = None
+    M: np.matrix = None
+    iM: np.matrix = None
+    boundingSphere: Sphere = (None, None)
 
     def __init__(self, vertices: np.matrix):
         assert vertices.shape == (4, 3)
@@ -41,7 +35,7 @@ def getBoundingSphere(tetrahedron: Tetrahedron) -> Sphere:
 # "COLLISION" CHECKS:
 
 
-def isInsideT(point: np.matrix, tetrahedron: Tetrahedron) -> Boolean:
+def isInsideT(point: np.matrix, tetrahedron: Tetrahedron) -> bool:
     assert point.shape == (1, 3)
     o = tetrahedron.o
     iM = tetrahedron.iM
@@ -49,13 +43,13 @@ def isInsideT(point: np.matrix, tetrahedron: Tetrahedron) -> Boolean:
     return (c >= 0).all() and np.dot(c, [1, 1, 1]) <= 1
 
 
-def isInsideS(point: np.matrix, sphere: Sphere) -> Boolean:
+def isInsideS(point: np.matrix, sphere: Sphere) -> bool:
     (center, radius) = sphere
     assert point.shape == (1, 3)
     return np.linalg.norm(point - center) <= radius
 
 
-def isInsideBS(point: np.matrix, tetrahedron: Tetrahedron) -> Boolean:
+def isInsideBS(point: np.matrix, tetrahedron: Tetrahedron) -> bool:
     return isInsideS(point, tetrahedron.boundingSphere)
 
 
