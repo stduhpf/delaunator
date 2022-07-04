@@ -122,12 +122,13 @@ def plotTetrahedron(t: Tetrahedron, ax: Axes) -> None:
 
 if __name__ == "__main__":
     t: Tetrahedron = Tetrahedron(
-        np.matrix([[0, 0, 0], [1, 0.5, 0], [0, 1, 1], [1, 0, 1]])
+        np.matrix([[0, 0, 0], [1, 1, 0], [0, 1, 1], [1, 0, 1]])
     )
     print(t.vert)
     (c, r) = getBoundingSphere(t)
     print(f"center: {c}, radius: {r}")
     ax = plt.axes(projection="3d")
+    plotTetrahedron(t,ax)
 
     scatterPointsDemo(t, ax)
 
