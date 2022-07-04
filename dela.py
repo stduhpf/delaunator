@@ -125,10 +125,10 @@ if __name__ == "__main__":
         np.matrix([[0, 0, 0], [1, 1, 0], [0, 1, 1], [1, 0, 1]])
     )
     print(t.vert)
-    (c, r) = getBoundingSphere(t)
+    (c, r) = t.boundingSphere
     print(f"center: {c}, radius: {r}")
     ax = plt.axes(projection="3d")
-    plotTetrahedron(t,ax)
+    plotTetrahedron(t, ax)
 
     scatterPointsDemo(t, ax)
 
