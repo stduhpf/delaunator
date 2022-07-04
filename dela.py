@@ -1,8 +1,10 @@
 from asyncio.windows_events import NULL
 from dataclasses import dataclass
 from tkinter import CENTER
+from tkinter.messagebox import NO
 from typing import Tuple
 from xmlrpc.client import Boolean
+from matplotlib.axes import Axes
 from matplotlib.markers import MarkerStyle
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,6 +38,9 @@ def getBoundingSphere(tetrahedron: Tetrahedron) -> Sphere:
     return (g + o, np.linalg.norm(g))
 
 
+# "COLLISION" CHECKS:
+
+
 def isInsideT(point: np.matrix, tetrahedron: Tetrahedron) -> Boolean:
     assert point.shape == (1, 3)
     o = tetrahedron.o
@@ -44,7 +49,7 @@ def isInsideT(point: np.matrix, tetrahedron: Tetrahedron) -> Boolean:
     return (c >= 0).all() and np.dot(c, [1, 1, 1]) <= 1
 
 
-def isInsideS(point: np.matrix, sphere: Sphere):
+def isInsideS(point: np.matrix, sphere: Sphere) -> Boolean:
     (center, radius) = sphere
     assert point.shape == (1, 3)
     return np.linalg.norm(point - center) <= radius
@@ -54,7 +59,10 @@ def isInsideBS(point: np.matrix, tetrahedron: Tetrahedron) -> Boolean:
     return isInsideS(point, tetrahedron.boundingSphere)
 
 
-def scatterPointsDemo(t: Tetrahedron, ax, N=1000):
+# PLOTTING:
+
+
+def scatterPointsDemo(t: Tetrahedron, ax: Axes, N=1000) -> None:
     rPoints = np.array([[0, 0, 0]])
     bPoints = np.array([[0, 0, 0]])
     gPoints = np.array([[0, 0, 0]])
@@ -77,15 +85,7 @@ def scatterPointsDemo(t: Tetrahedron, ax, N=1000):
     # ax.scatter(pt[0], pt[1], pt[2], c="b", marker=".")
 
 
-if __name__ == "__main__":
-    t: Tetrahedron = Tetrahedron(
-        np.matrix([[0, 0, 0], [1, 0.5, 0], [0, 1, 1], [1, 0, 1]])
-    )
-    print(t.vert)
-    (c, r) = getBoundingSphere(t)
-    print(f"center: {c}, radius: {r}")
-    ax = plt.axes(projection="3d")
-
+def plotTetrahedron(t: Tetrahedron, ax: Axes) -> None:
     tx = [
         t.vert[0, 0],
         t.vert[1, 0],
@@ -111,12 +111,11 @@ if __name__ == "__main__":
         t.vert[1, 2],
         t.vert[2, 2],
         t.vert[3, 2],
-        t.vert[0, 0],
+        t.vert[0, 2],
         t.vert[2, 2],
         t.vert[1, 2],
         t.vert[3, 2],
     ]
-
     ax.plot(tx, ty, tz)
     ax.scatter(
         t.boundingSphere[0][0, 0],
@@ -125,6 +124,16 @@ if __name__ == "__main__":
         c="black",
         marker="x",
     )
+
+
+if __name__ == "__main__":
+    t: Tetrahedron = Tetrahedron(
+        np.matrix([[0, 0, 0], [1, 0.5, 0], [0, 1, 1], [1, 0, 1]])
+    )
+    print(t.vert)
+    (c, r) = getBoundingSphere(t)
+    print(f"center: {c}, radius: {r}")
+    ax = plt.axes(projection="3d")
 
     scatterPointsDemo(t, ax)
 
