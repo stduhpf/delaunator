@@ -226,7 +226,7 @@ def pointInBoundSphere(point: Point, tetrahedron: Tetra) -> bool:
     return pointInSphere(point, tetrahedron.boundingSphere)
 
 
-def addPoint(point: Point, tetrahedrization: list[Tetra]):
+def addPoint(point: Point, tetrahedrization: list[Tetra]) -> list[Tetra]:
     containers: list[Tetra] = []
     for tet in tetrahedrization:
         if pointInBoundSphere(point, tet):
@@ -247,54 +247,27 @@ def addPoint(point: Point, tetrahedrization: list[Tetra]):
                         break
                 if not contained:
                     remainingFaces.append(f)
-    for tet in containers:
-        for seg in tet.segments:
-            if not seg.checked:
-                seg.checked = True
-                if all(face in containedFaces for face in seg.in_triangles):
-                    containedEdges.append(seg)
-                else:
-                    remainingEdges.append(seg)
+    # for tet in containers:
+    #     for seg in tet.segments:
+    #         if not seg.checked:
+    #             seg.checked = True
+    #             if all(face in containedFaces for face in seg.in_triangles):
+    #                 containedEdges.append(seg)
+    #             else:
+    #                 remainingEdges.append(seg)
 
-    newTet: list[Tetra] = []
-    for face in remainingFaces:
-        t = Tetra(p, *face.vertices)
-        print(t)
-
-    print(containedFaces)
-    print(remainingFaces)
-    print("\n")
-    print(containedEdges)
-    print(remainingEdges)
     for tet in containers:
         for f in tet.triangles:
             f.checked = False
         for seg in tet.segments:
             seg.checked = False
 
+    newTet: list[Tetra] = []
+    for face in remainingFaces:
+        t = Tetra(p, *face.vertices)
+        newTet.append(t)
+    tetrahedrization = [
+        tet for tet in tetrahedrization if not tet in containers
+    ] + newTet
 
-# A = Point.make(0.0, 0.0, 10.0, "_A_")
-# B = Point.make(-20.0 * sqrt(2) / 3.0, 0.0, -10.0 / 3.0, "_B_")
-# C = Point.make(20.0 * sqrt(2) / 6.0, 10.0 * sqrt(2.0 / 3.0), -10.0 / 3.0, "_C_")
-# D = Point.make(20.0 * sqrt(2) / 6.0, -10.0 * sqrt(2.0 / 3.0), -10.0 / 3.0, "_D_")
-# bigTetrahedron = Tetra(A, B, C, D)
-# E = Point.make(0.0, 5.0, 10.0, "E")
-# t2 = Tetra(A, B, C, E)
-
-
-p = Point.make(0.02, 0.01, 0.01, "P")
-
-A = Point.make(0.0, 0.0, 1.0, "_A_")
-B = Point.make(0.0, 0.0, -1.0, "_B_")
-C = Point.make(1.0, 0.0, 0.0, "_C_")
-D = Point.make(0.0, 1.0, 0.0, "_D_")
-E = Point.make(-1.0, 0.0, 0.0, "_E_")
-F = Point.make(0.0, -1.0, 0.0, "_F_")
-
-t1 = Tetra(A, B, C, D)
-t2 = Tetra(A, B, D, E)
-t3 = Tetra(A, B, E, F)
-t4 = Tetra(A, B, F, C)
-
-
-addPoint(p, [t1, t2, t3, t4])
+    return tetrahedrization
