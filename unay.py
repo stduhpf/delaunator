@@ -12,6 +12,8 @@ class Point:
         new = cls(x, y, z, name, cc=hash("Called correctly"))
         try:
             old = [x for x in cls._instances if x.val == new.val][0]
+            old.name += "/" + new.name
+            print(f"Warning, re-creating existing point {old}")
             del new
             return old
         except (ValueError, IndexError):
@@ -73,7 +75,6 @@ class Segment:
         return self.name
 
     def __hash__(self) -> int:
-        # print("hash called")
         return hash(self.start) ^ hash(self.end)
 
     def __eq__(self, other: "Segment") -> bool:
@@ -92,19 +93,35 @@ class Segment:
         return self.end if p == self.start else self.start
 
     def remove_tetra(self, t: "Tetra") -> None:
-        self.in_tetra.remove(t)
+        try:
+            self.in_tetra.remove(t)
+        except ValueError:
+            print(f"somehow removing {t} from {self} failed : {self.in_tetra}")
         if len(self.in_tetra) + len(self.in_triangles) == 0:
             self.discard()
 
     def remove_triangle(self, t: "Triangle") -> None:
-        self.in_triangles.remove(t)
+        try:
+            self.in_triangles.remove(t)
+        except ValueError:
+            print(f"somehow removing {t} from {self} failed : {self.in_triangles}")
         if len(self.in_tetra) + len(self.in_triangles) == 0:
             self.discard()
 
     def discard(self):
-        print(f"discarding {self}")
-        self.start.in_segments.remove(self)
-        self.end.in_segments.remove(self)
+        # print(f"discarding {self}")
+        try:
+            self.start.in_segments.remove(self)
+        except ValueError:
+            print(
+                f"somehow removing {self} from {self.start} failed : {self.start.in_segments}"
+            )
+        try:
+            self.end.in_segments.remove(self)
+        except ValueError:
+            print(
+                f"somehow removing {self} from {self.end} failed : {self.end.in_segments}"
+            )
 
 
 class Triangle:
@@ -163,9 +180,14 @@ class Triangle:
             self.discard()
 
     def discard(self):
-        print(f"discarding {self}")
+        # print(f"discarding {self}")
         for vertex in self.vertices:
-            vertex.in_triangles.remove(self)
+            try:
+                vertex.in_triangles.remove(self)
+            except ValueError:
+                print(
+                    f"somehow removing {self} from {vertex} failed : {vertex.in_triangles}"
+                )
         for segment in self.segments:
             segment.remove_triangle(self)
 
@@ -227,9 +249,14 @@ class Tetra:
         return [t for t in self.triangles if not p in t.vertices][0]
 
     def discard(self):
-        print(f"discarding {self}")
+        # print(f"discarding {self}")
         for vertex in self.vertices:
-            vertex.in_tetra.remove(self)
+            try:
+                vertex.in_tetra.remove(self)
+            except ValueError:
+                print(
+                    f"somehow removing {self} from {vertex} failed : {vertex.in_tetra}"
+                )
         for segment in self.segments:
             segment.remove_tetra(self)
         for triangle in self.triangles:
@@ -262,15 +289,13 @@ def pointInBoundSphere(point: Point, tetrahedron: Tetra) -> bool:
     return pointInSphere(point, tetrahedron.boundingSphere)
 
 
-def addPoint(point: Point, tetrahedrization: list[Tetra]) -> list[Tetra]:
+def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
     containers: list[Tetra] = []
     for tet in tetrahedrization:
         if pointInBoundSphere(point, tet):
             containers.append(tet)
     containedFaces: list[Triangle] = []
     remainingFaces: list[Triangle] = []
-    containedEdges: list[Segment] = []
-    remainingEdges: list[Segment] = []
     for tet in containers:
         for f in tet.triangles:
             if not f.checked:
@@ -292,7 +317,7 @@ def addPoint(point: Point, tetrahedrization: list[Tetra]) -> list[Tetra]:
 
     newTet: list[Tetra] = []
     for face in remainingFaces:
-        t = Tetra(p, *face.vertices)
+        t = Tetra(point, *face.vertices)
         newTet.append(t)
     tetrahedrization = [
         tet for tet in tetrahedrization if not tet in containers
@@ -304,19 +329,19 @@ def addPoint(point: Point, tetrahedrization: list[Tetra]) -> list[Tetra]:
     return tetrahedrization
 
 
-p = Point.make(0.02, 0.01, 0.01, "P")
+# p = Point.make(0.02, 0.01, 0.01, "P")
 
-A = Point.make(0.0, 0.0, 1.0, "_A_")
-B = Point.make(0.0, 0.0, -1.0, "_B_")
-C = Point.make(1.0, 0.0, 0.0, "_C_")
-D = Point.make(0.0, 1.0, 0.0, "_D_")
-E = Point.make(-1.0, 0.0, 0.0, "_E_")
-F = Point.make(0.0, -1.0, 0.0, "_F_")
+# A = Point.make(0.0, 0.0, 1.0, "_A_")
+# B = Point.make(0.0, 0.0, -1.0, "_B_")
+# C = Point.make(1.0, 0.0, 0.0, "_C_")
+# D = Point.make(0.0, 1.0, 0.0, "_D_")
+# E = Point.make(-1.0, 0.0, 0.0, "_E_")
+# F = Point.make(0.0, -1.0, 0.0, "_F_")
 
-t1 = Tetra(A, B, C, D)
-t2 = Tetra(A, B, D, E)
-t3 = Tetra(A, B, E, F)
-t4 = Tetra(A, B, F, C)
+# t1 = Tetra(A, B, C, D)
+# t2 = Tetra(A, B, D, E)
+# t3 = Tetra(A, B, E, F)
+# t4 = Tetra(A, B, F, C)
 
 
-print(addPoint(p, [t1, t2, t3, t4]))
+# print(addPoint([t1, t2, t3, t4], p))
