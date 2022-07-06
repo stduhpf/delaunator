@@ -247,32 +247,14 @@ def addPoint(point: Point, tetrahedrization: list[Tetra]):
                         break
                 if not contained:
                     remainingFaces.append(f)
+    for tet in containers:
         for seg in tet.segments:
             if not seg.checked:
                 seg.checked = True
-                tets = [t for t in containers if t in seg.in_tetra]
-                if len(tets) > 0:
-                    # print(f"\t{seg}:")
-                    s = tet.complementS(seg)
-                    dest = s.start
-                    vertex = s.end
-                    t = tet
-                    while True:
-                        # print(f"dest : {dest}\n vertex: {vertex}\n seg: {s}\n t: {t}\n")
-                        rem = [_t for _t in tets if _t != t and vertex in _t.vertices]
-                        if len(rem) < 1:
-                            # print("No loop\n")
-                            remainingEdges.append(seg)
-                            break
-                        t = rem[0]
-                        s = t.complementS(seg)
-
-                        # print(f"{vertex}=>{s.complement(vertex)}\n")
-                        vertex = s.complement(vertex)
-                        if vertex == dest:
-                            containedEdges.append(seg)
-                            # print("Yes loop\n")
-                            break
+                if all(face in containedFaces for face in seg.in_triangles):
+                    containedEdges.append(seg)
+                else:
+                    remainingEdges.append(seg)
 
     newTet: list[Tetra] = []
     for face in remainingFaces:
