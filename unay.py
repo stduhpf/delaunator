@@ -44,15 +44,15 @@ class Point:
 
 
 class Segment:
-    _instances: list[tuple[int, "Segment"]] = []
+    _instances: list["Segment"] = []
 
     @classmethod
     def make(cls, start, end) -> "Segment":
         try:
-            return [x[1] for x in cls._instances if x[0] == hash(start) ^ hash(end)][0]
+            return [x for x in cls._instances if x.chkPoints(start, end)][0]
         except (ValueError, IndexError):
             new = cls(start, end, hash("Called correctly"))
-            cls._instances.append((hash(new), new))
+            cls._instances.append(new)
             return new
 
     def __init__(self, start: Point, end: Point, cc: int = 0) -> None:
@@ -74,13 +74,13 @@ class Segment:
             return object.__repr__(self)
         return self.name
 
-    def __hash__(self) -> int:
-        return hash(self.start) ^ hash(self.end)
-
     def __eq__(self, other: "Segment") -> bool:
         return (self.start == other.start and self.end == other.end) or (
             self.start == other.end and self.end == other.start
         )
+
+    def chkPoints(self, start: Point, end: Point) -> bool:
+        return all(vertex in [self.start, self.end] for vertex in [start, end])
 
     def contains(self, p: Point) -> bool:
         return self.start == p or self.end == p
@@ -125,17 +125,15 @@ class Segment:
 
 
 class Triangle:
-    _instances: list[tuple[int, "Triangle"]] = []
+    _instances: list["Triangle"] = []
 
     @classmethod
     def make(cls, A: Point, B: Point, C: Point) -> "Triangle":
         try:
-            return [
-                x[1] for x in cls._instances if x[0] == hash(A) ^ hash(B) ^ hash(C)
-            ][0]
+            return [x for x in cls._instances if x.chkPoints(A, B, C)][0]
         except (ValueError, IndexError):
             new = cls(A, B, C, hash("Called correctly"))
-            cls._instances.append((hash(new), new))
+            cls._instances.append(new)
             return new
 
     def __init__(self, A: Point, B: Point, C: Point, cc: int = None) -> None:
@@ -157,9 +155,11 @@ class Triangle:
 
         self.checked = False
 
-    def __hash__(self) -> int:
-        # print("hash called")
-        return hash(self.vertices[0]) ^ hash(self.vertices[1]) ^ hash(self.vertices[2])
+    def __eq__(self, other: "Triangle") -> bool:
+        return all(vertex in self.vertices for vertex in other.vertices)
+
+    def chkPoints(self, A: Point, B: Point, C: Point) -> bool:
+        return all(vertex in self.vertices for vertex in [A, B, C])
 
     def __repr__(self) -> str:
         if self.name is None:
@@ -175,7 +175,10 @@ class Triangle:
         return [s for s in self.segments if not s.contains(p)][0]
 
     def remove_tetra(self, t: "Tetra") -> None:
-        self.in_tetra.remove(t)
+        try:
+            self.in_tetra.remove(t)
+        except ValueError:
+            print(f"somehow removing {t} from {self} failed : {self.in_tetra}")
         if len(self.in_tetra) == 0:
             self.discard()
 
@@ -193,6 +196,17 @@ class Triangle:
 
 
 class Tetra:
+    _instances: list["Tetra"] = []
+
+    @classmethod
+    def make(cls, A: Point, B: Point, C: Point, D: Point) -> "Tetra":
+        try:
+            return [x for x in cls._instances if x.chkPoints(A, B, C, D)][0]
+        except (ValueError, IndexError):
+            new = cls(A, B, C, D)
+            cls._instances.append(new)
+            return new
+
     def setup(self):
         self.vert = np.vstack([vertex.val for vertex in self.vertices])
         self.o = self.vert[3]
@@ -229,6 +243,12 @@ class Tetra:
 
         self.name = f"({A}{B}{C}{D})"
         self.setup()
+
+    def __eq__(self, other: "Tetra") -> bool:
+        return all(vertex in self.vertices for vertex in other.vertices)
+
+    def chkPoints(self, A: Point, B: Point, C: Point, D: Point) -> bool:
+        return all(vertex in self.vertices for vertex in [A, B, C, D])
 
     def __repr__(self) -> str:
         if self.name is None:
@@ -312,12 +332,10 @@ def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
     for tet in containers:
         for f in tet.triangles:
             f.checked = False
-        for seg in tet.segments:
-            seg.checked = False
 
     newTet: list[Tetra] = []
     for face in remainingFaces:
-        t = Tetra(point, *face.vertices)
+        t = Tetra.make(point, *face.vertices)
         newTet.append(t)
     tetrahedrization = [
         tet for tet in tetrahedrization if not tet in containers
@@ -327,21 +345,3 @@ def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
         tet.discard()
 
     return tetrahedrization
-
-
-# p = Point.make(0.02, 0.01, 0.01, "P")
-
-# A = Point.make(0.0, 0.0, 1.0, "_A_")
-# B = Point.make(0.0, 0.0, -1.0, "_B_")
-# C = Point.make(1.0, 0.0, 0.0, "_C_")
-# D = Point.make(0.0, 1.0, 0.0, "_D_")
-# E = Point.make(-1.0, 0.0, 0.0, "_E_")
-# F = Point.make(0.0, -1.0, 0.0, "_F_")
-
-# t1 = Tetra(A, B, C, D)
-# t2 = Tetra(A, B, D, E)
-# t3 = Tetra(A, B, E, F)
-# t4 = Tetra(A, B, F, C)
-
-
-# print(addPoint([t1, t2, t3, t4], p))
