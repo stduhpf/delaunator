@@ -91,6 +91,21 @@ class Segment:
         assert self.contains(p), f"Point {p} cannot be found in segment {self}"
         return self.end if p == self.start else self.start
 
+    def remove_tetra(self, t: "Tetra") -> None:
+        self.in_tetra.remove(t)
+        if len(self.in_tetra) + len(self.in_triangles) == 0:
+            self.discard()
+
+    def remove_triangle(self, t: "Triangle") -> None:
+        self.in_triangles.remove(t)
+        if len(self.in_tetra) + len(self.in_triangles) == 0:
+            self.discard()
+
+    def discard(self):
+        print(f"discarding {self}")
+        self.start.in_segments.remove(self)
+        self.end.in_segments.remove(self)
+
 
 class Triangle:
     _instances: list[tuple[int, "Triangle"]] = []
@@ -141,6 +156,18 @@ class Triangle:
     def complementP(self, p: Point) -> Segment:
         assert p in self.vertices
         return [s for s in self.segments if not s.contains(p)][0]
+
+    def remove_tetra(self, t: "Tetra") -> None:
+        self.in_tetra.remove(t)
+        if len(self.in_tetra) == 0:
+            self.discard()
+
+    def discard(self):
+        print(f"discarding {self}")
+        for vertex in self.vertices:
+            vertex.in_triangles.remove(self)
+        for segment in self.segments:
+            segment.remove_triangle(self)
 
 
 class Tetra:
@@ -199,6 +226,15 @@ class Tetra:
         assert p in self.vertices
         return [t for t in self.triangles if not p in t.vertices][0]
 
+    def discard(self):
+        print(f"discarding {self}")
+        for vertex in self.vertices:
+            vertex.in_tetra.remove(self)
+        for segment in self.segments:
+            segment.remove_tetra(self)
+        for triangle in self.triangles:
+            triangle.remove_tetra(self)
+
 
 def getBoundingSphere(tetrahedron: Tetra) -> Sphere:
     o = tetrahedron.o
@@ -247,14 +283,6 @@ def addPoint(point: Point, tetrahedrization: list[Tetra]) -> list[Tetra]:
                         break
                 if not contained:
                     remainingFaces.append(f)
-    # for tet in containers:
-    #     for seg in tet.segments:
-    #         if not seg.checked:
-    #             seg.checked = True
-    #             if all(face in containedFaces for face in seg.in_triangles):
-    #                 containedEdges.append(seg)
-    #             else:
-    #                 remainingEdges.append(seg)
 
     for tet in containers:
         for f in tet.triangles:
@@ -270,4 +298,25 @@ def addPoint(point: Point, tetrahedrization: list[Tetra]) -> list[Tetra]:
         tet for tet in tetrahedrization if not tet in containers
     ] + newTet
 
+    for tet in containers:
+        tet.discard()
+
     return tetrahedrization
+
+
+p = Point.make(0.02, 0.01, 0.01, "P")
+
+A = Point.make(0.0, 0.0, 1.0, "_A_")
+B = Point.make(0.0, 0.0, -1.0, "_B_")
+C = Point.make(1.0, 0.0, 0.0, "_C_")
+D = Point.make(0.0, 1.0, 0.0, "_D_")
+E = Point.make(-1.0, 0.0, 0.0, "_E_")
+F = Point.make(0.0, -1.0, 0.0, "_F_")
+
+t1 = Tetra(A, B, C, D)
+t2 = Tetra(A, B, D, E)
+t3 = Tetra(A, B, E, F)
+t4 = Tetra(A, B, F, C)
+
+
+print(addPoint(p, [t1, t2, t3, t4]))
