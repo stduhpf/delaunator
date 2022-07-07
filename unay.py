@@ -3,6 +3,8 @@ import numpy as np
 
 Sphere = tuple[np.ndarray, float]
 
+bigTVert = []
+
 
 class Point:
     _instances: list["Point"] = []
@@ -62,7 +64,7 @@ class Segment:
         start.in_segments.append(self)
         end.in_segments.append(self)
 
-        self.name = f"[{start}{end}]"
+        self.name = f"[{start} {end}]"
 
         self.in_triangles: list["Triangle"] = []
         self.in_tetra: list["Tetra"] = []
@@ -150,7 +152,7 @@ class Triangle:
         for vertex in self.vertices:
             vertex.in_triangles.append(self)
 
-        self.name: str = "{" + f"{A}{B}{C}" + "}"
+        self.name: str = "{" + f"{A} {B} {C}" + "}"
         self.in_tetra: list["Tetra"] = []
 
         self.checked = False
@@ -209,10 +211,14 @@ class Tetra:
 
     def setup(self):
         self.vert = np.vstack([vertex.val for vertex in self.vertices])
-        self.o = self.vert[3]
-        self.M = self.vert[:3] - self.o
-        self.iM = np.linalg.inv(self.M)
-        self.boundingSphere = getBoundingSphere(self)
+        self.o: np.ndarray = self.vert[3]
+        self.M: np.matrix = self.vert[:3] - self.o
+        try:
+            self.iM: np.matrix = np.linalg.inv(self.M)
+        except np.linalg.LinAlgError:
+            print(f"coplanar: {self}")
+            self.iM = None
+        self.boundingSphere: Sphere = getBoundingSphere(self)
 
     def __init__(
         self, A: Point, B: Point, C: Point, D: Point, name: str = None
@@ -241,7 +247,7 @@ class Tetra:
         for vertex in self.vertices:
             vertex.in_tetra.append(self)
 
-        self.name = f"({A}{B}{C}{D})"
+        self.name = f"({A} {B} {C} {D})"
         self.setup()
 
     def __eq__(self, other: "Tetra") -> bool:
@@ -282,11 +288,26 @@ class Tetra:
         for triangle in self.triangles:
             triangle.remove_tetra(self)
 
+    def removeVertexFromCoords(self, coords: np.ndarray, ignore: list[Point]):
+        r = [v for v in self.vertices if v in ignore]
+        normalize = False
+        for k in r:
+            i = self.vertices.index(k)
+            if i != 3:
+                coords[i] = 0
+            else:
+                normalize = True
+        if normalize:
+            coords = coords / coords.sum()
+        return coords
+
 
 def getBoundingSphere(tetrahedron: Tetra) -> Sphere:
     o = tetrahedron.o
     M = tetrahedron.M
     iM = tetrahedron.iM
+    if iM is None:
+        return None
     k = np.diag(np.matmul(M, np.transpose(M))) * 0.5
     g = np.matmul(iM, k)
     return (g + o, np.linalg.norm(g))
@@ -295,6 +316,8 @@ def getBoundingSphere(tetrahedron: Tetra) -> Sphere:
 def pointInTetra(point: Point, tetrahedron: Tetra) -> bool:
     o = tetrahedron.o
     iM = tetrahedron.iM
+    if iM is None:
+        return False
     c = np.matmul(point.val - o, iM)
     return (c >= 0).all() and np.dot(c, [1, 1, 1]) <= 1
 
@@ -306,6 +329,8 @@ def pointInSphere(point: Point, sphere: Sphere) -> bool:
 
 
 def pointInBoundSphere(point: Point, tetrahedron: Tetra) -> bool:
+    if tetrahedron.iM is None:
+        return True
     return pointInSphere(point, tetrahedron.boundingSphere)
 
 
@@ -358,19 +383,24 @@ def point_name(i: int):
         return s
 
 
-def coordsInTetra(point: Point, tetra: Tetra):
+def coordsInTetra(point: Point, tetra: Tetra) -> tuple[np.ndarray, bool]:
     loc = point.val - tetra.o
-    return np.matmul(loc, tetra.iM)
+    c = np.matmul(loc, tetra.iM)
+    return (c, (c > -5.0e-08).all() and np.dot(c, [1, 1, 1]) < 1 + 5e-08)
 
 
-def findLocalTetra(point: Point, tetrahedrization: list[Tetra]) -> Tetra:
+def findLocalTetra(
+    point: Point, tetrahedrization: list[Tetra]
+) -> tuple[Tetra, np.ndarray]:
+    global bigTVert
     for t in tetrahedrization:
-        if pointInTetra(point, t):
-            return t
+        c = coordsInTetra(point, t)
+        if c[1]:
+            return (t, t.removeVertexFromCoords(c[0], bigTVert))
     return None
 
 
-def run(points: list[tuple[str, list[float]]]) -> list[Tetra]:
+def run(points: list[tuple[str, list[float]]]) -> list:
     bigT: Tetra = Tetra(
         Point.make(0.0, 0.0, 100000000.0, "0"),
         Point.make(-200000000.0 * sqrt(2) / 3.0, 00000000.0, -100000000.0 / 3.0, "1"),
@@ -388,18 +418,16 @@ def run(points: list[tuple[str, list[float]]]) -> list[Tetra]:
         ),
     )
 
+    global bigTVert
+
+    bigTVert = bigT.vertices
+
     tetrahedrization = [bigT]
 
-    for (i, p) in enumerate(points):
+    for p in points:
         tetrahedrization = addPoint(
             tetrahedrization,
             Point.make(*(p[1]), p[0]),
         )
-
-    tetrahedrization = [
-        t
-        for t in tetrahedrization
-        if not any(p for p in t.vertices if p in bigT.vertices)
-    ]
 
     return tetrahedrization

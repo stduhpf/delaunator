@@ -1,8 +1,9 @@
+from math import sqrt
 from PIL import Image
 import numpy as np
 from dela import plotTetrahedrization
 
-from unay import Point, coordsInTetra, findLocalTetra, run
+from unay import Point, Segment, Tetra, Triangle, coordsInTetra, findLocalTetra, run
 import matplotlib.pyplot as plt
 
 # TODO: gamma correction, color spaces, accelerating structure
@@ -69,24 +70,39 @@ colors = {
     "GLOW_LICHEN": [127, 167, 150],
 }
 
-multipliers = [0.71, 0.86, 1.0, 0.53]
+
+def gammaInv(col: list[float]) -> list[float]:
+    return [c * c for c in col]
+
+
+def gamma(col: list[float]) -> list[float]:
+    return [sqrt(max(c, 0)) for c in col]
+
+
+# multipliers = [0.71, 0.86, 1.0, 0.53]
+
+multipliers = [0.71, 0.86, 1.0]
+
+# multipliers = [0.86]
 
 colorList = []
 for (i, m) in enumerate(multipliers):
     colorList += [
         (
-            c[0] + str(i),
-            [
-                c[1][0] * m,
-                c[1][1] * m,
-                c[1][2] * m,
-            ],
+            c[0] + "|" + str(i),
+            gammaInv(
+                [
+                    c[1][0] * m * (1 + 1e-6 * np.random.rand()),
+                    c[1][1] * m * (1 + 1e-6 * np.random.rand()),
+                    c[1][2] * m * (1 + 1e-6 * np.random.rand()),
+                ]
+            ),
         )
         for c in colors.items()
     ]
 # print(colorList)
 
-palette = run([c for c in colors.items()])
+palette = run(colorList)
 
 print("palette generated")
 
@@ -99,35 +115,49 @@ print("palette generated")
 # plotTetrahedrization(palette, ax)
 # plt.show()
 
-image = Image.open("tests/img.PNG").resize((128, 128))
+bni = Image.open("blue.png")
+bns = bni.size
+blueNoise = bni.load()
+
+image = Image.open("tests/jojokerker.PNG").resize((128, 128))
 
 
 newImageData = []
-for color in image.getdata():
-    p = Point.make(color[0], color[1], color[2])
-    t = findLocalTetra(p, palette)
-    if t is None:
-        newImageData.append((0, 0, 0, 0))
-        continue
-    xyz = coordsInTetra(p, t)
-    r = np.random.random()
-    c = color
-    if r > xyz[0]:
-        r -= xyz[0]
-        if r > xyz[1]:
-            r -= xyz[1]
-            if r > xyz[2]:
-                c = (*(t.vertices[3].val).astype(int), 255)
-            else:
-                c = (*(t.vertices[2].val).astype(int), 255)
-        else:
-            c = (*(t.vertices[1].val).astype(int), 255)
-    else:
-        c = (*(t.vertices[0].val).astype(int), 255)
-    # print(f"{(*t.o, 255)}  {color}")
-    newImageData.append(c)
-newImage = Image.new(image.mode, image.size)
-newImage.putdata(newImageData)
 
-newImage.save("out_.png")
+pixels = image.load()
+newImage = Image.new(image.mode, image.size)
+
+for x in range(image.size[0]):
+    for y in range(image.size[1]):
+        color = gammaInv([p for p in pixels[x, y]])
+        # print(f"{pixels[x, y]} => {color}")
+        p = Point.make(color[0], color[1], color[2])
+        t = findLocalTetra(p, palette)
+        if t is None:
+            print(f"impossible color {color}, {t}")
+            newImageData.append((0, 0, 0, 0))
+            continue
+        c = []
+        xyz = t[1]
+        # r = np.random.random()
+        r = blueNoise[x, y][0] / 255.0
+        if r > xyz[0]:
+            r -= xyz[0]
+            if r > xyz[1]:
+                r -= xyz[1]
+                if r > xyz[2]:
+                    c = gamma(t[0].vertices[3].val.tolist())
+                else:
+                    c = gamma(t[0].vertices[2].val.tolist())
+            else:
+                c = gamma(t[0].vertices[1].val.tolist())
+        else:
+            c = gamma(t[0].vertices[0].val.tolist())
+
+        # print(f"{(*t.o, 255)}  {color}")
+        casList = [int(v) for v in c]
+        # print(casList)
+        newImage.putpixel((x, y), (casList[0], casList[1], casList[2], 255))
+image.save("scaled.png")
+newImage.save("out.png")
 print("saved!")
