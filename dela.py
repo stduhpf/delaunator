@@ -77,17 +77,6 @@ def plotTetrahedrization(tz: list[Tetra], ax: Axes, ignore: list[Point] = []):
         plotTetrahedron(t, ax, ignore)
 
 
-def point_name(i: int):
-    if i < 26:
-        return chr(65 + i)
-    else:
-        s = ""
-        while i:
-            s = chr((97 if i >= 26 else 64) + i % 26) + s
-            i = int(i / 26)
-        return s
-
-
 if __name__ == "__main__":
     bigT: Tetra = Tetra(
         Point.make(0.0, 0.0, 10.0, "0"),
@@ -108,7 +97,7 @@ if __name__ == "__main__":
     # xs = []
     # ys = []
     # zs = []
-    for i in range(26):
+    for i in range(128):
         c = np.random.rand(1, 3) * 2.0 - 1.0
         tetrahedrization = addPoint(
             tetrahedrization,

@@ -345,3 +345,61 @@ def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
         tet.discard()
 
     return tetrahedrization
+
+
+def point_name(i: int):
+    if i < 26:
+        return chr(65 + i)
+    else:
+        s = ""
+        while i:
+            s = chr((97 if i >= 26 else 64) + i % 26) + s
+            i = int(i / 26)
+        return s
+
+
+def coordsInTetra(point: Point, tetra: Tetra):
+    loc = point.val - tetra.o
+    return np.matmul(loc, tetra.iM)
+
+
+def findLocalTetra(point: Point, tetrahedrization: list[Tetra]) -> Tetra:
+    for t in tetrahedrization:
+        if pointInTetra(point, t):
+            return t
+    return None
+
+
+def run(points: list[tuple[str, list[float]]]) -> list[Tetra]:
+    bigT: Tetra = Tetra(
+        Point.make(0.0, 0.0, 100000000.0, "0"),
+        Point.make(-200000000.0 * sqrt(2) / 3.0, 00000000.0, -100000000.0 / 3.0, "1"),
+        Point.make(
+            200000000.0 * sqrt(2) / 6.0,
+            100000000.0 * sqrt(2.0 / 3.0),
+            -100000000.0 / 3.0,
+            "2",
+        ),
+        Point.make(
+            200000000.0 * sqrt(2) / 6.0,
+            -100000000.0 * sqrt(2.0 / 3.0),
+            -100000000.0 / 3.0,
+            "3",
+        ),
+    )
+
+    tetrahedrization = [bigT]
+
+    for (i, p) in enumerate(points):
+        tetrahedrization = addPoint(
+            tetrahedrization,
+            Point.make(*(p[1]), p[0]),
+        )
+
+    tetrahedrization = [
+        t
+        for t in tetrahedrization
+        if not any(p for p in t.vertices if p in bigT.vertices)
+    ]
+
+    return tetrahedrization
