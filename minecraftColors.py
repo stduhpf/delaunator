@@ -1,9 +1,8 @@
-from math import sqrt
+from math import floor, pow
 from PIL import Image
 import numpy as np
-from dela import plotTetrahedrization
 
-from unay import Point, Segment, Tetra, Triangle, coordsInTetra, findLocalTetra, run
+from unay import Point, findLocalTetra, run
 import matplotlib.pyplot as plt
 
 # TODO: gamma correction, color spaces, accelerating structure
@@ -69,33 +68,81 @@ colors = {
     "RAW_IRON": [216, 175, 147],
     "GLOW_LICHEN": [127, 167, 150],
 }
-
-
-def gammaInv(col: list[float]) -> list[float]:
-    return [c * c for c in col]
-
-
-def gamma(col: list[float]) -> list[float]:
-    return [sqrt(max(c, 0)) for c in col]
-
-
-# multipliers = [0.71, 0.86, 1.0, 0.53]
+multipliers = [0.71, 0.86, 1.0, 0.53]
 
 multipliers = [0.71, 0.86, 1.0]
 
 # multipliers = [0.86]
+
+
+def bayer(x: int, y: int, level: int) -> float:
+    if level <= 0:
+        return 0.5
+    if level == 1:
+        v = bayer.size[0] * bayer.size[1]
+        x = x % bayer.size[0]
+        y = y % bayer.size[1]
+        return (bayer.data[x, y]) / 254.0 * (v - 1) / v
+    return bayer(int(x / bayer.size[0]), int(y / bayer.size[1]), level - 1) / (
+        bayer.size[0] * bayer.size[1]
+    ) + bayer(x, y, 1)
+
+
+def bayer_d(x: int, y: int, level: int) -> float:
+    b = bayer(x, y, level)
+    values = pow(bayer.size[0] * bayer.size[1], level)
+    return b + 0.5 / values
+
+
+def gammaInv(col: list[float]) -> list[float]:
+    return rgb2ycocg([pow(c, 2.2) for c in col])
+
+
+def rgb2ycocg(col: list[float]) -> list[float]:
+    return [
+        0.25 * col[0] + 0.5 * col[1] + 0.25 * col[2],
+        0.5 * col[0] - 0.5 * col[2],
+        -0.25 * col[0] + 0.5 * col[1] - 0.25 * col[2],
+    ]
+
+
+def gamma(col: list[float]) -> list[float]:
+    col = ycocg2rgb(col)
+    return [pow(max(c, 0), 1.0 / 2.2) for c in col]
+
+
+def ycocg2rgb(col: list[float]) -> list[float]:
+    return [
+        col[0] + col[1] - col[2],
+        col[0] + col[2],
+        col[0] - col[1] - col[2],
+    ]
+
+
+def fract(x):
+    return x - floor(x)
+
+
+def ign(x, y):
+    return fract(52.9829189 * fract(0.06711056 * float(x) + 0.00583715 * float(y)))
+
+
+image = Image.open("tests/malty.png").resize((128, 199))
+
 
 colorList = []
 for (i, m) in enumerate(multipliers):
     colorList += [
         (
             c[0] + "|" + str(i),
-            gammaInv(
-                [
-                    c[1][0] * m * (1 + 1e-6 * np.random.rand()),
-                    c[1][1] * m * (1 + 1e-6 * np.random.rand()),
-                    c[1][2] * m * (1 + 1e-6 * np.random.rand()),
-                ]
+            (
+                gammaInv(
+                    [
+                        c[1][0] * m,
+                        c[1][1] * m,
+                        c[1][2] * m,
+                    ]
+                )
             ),
         )
         for c in colors.items()
@@ -119,16 +166,31 @@ bni = Image.open("blue.png")
 bns = bni.size
 blueNoise = bni.load()
 
-image = Image.open("tests/jojokerker.PNG").resize((128, 128))
-
+bayer8 = Image.open("bayer8.png")
+bayer.size = bayer8.size
+bayer.data = bayer8.load()
 
 newImageData = []
 
 pixels = image.load()
-newImage = Image.new(image.mode, image.size)
+newImage_b = Image.new(image.mode, image.size)
+newImage_w = Image.new(image.mode, image.size)
+newImage_ign = Image.new(image.mode, image.size)
+newImage_bay = Image.new(image.mode, image.size)
 
-for x in range(image.size[0]):
-    for y in range(image.size[1]):
+csv = []
+
+for y in range(image.size[1]):
+    csv.append([])
+    for x in range(image.size[0]):
+        # X = x / image.size[0]
+        # color = gammaInv(
+        #     [
+        #         200 * X + 150 * (1.0 - X),
+        #         25 * X + 160 * (1.0 - X),
+        #         190 * X + 255 * (1.0 - X),
+        #     ]
+        # )
         color = gammaInv([p for p in pixels[x, y]])
         # print(f"{pixels[x, y]} => {color}")
         p = Point.make(color[0], color[1], color[2])
@@ -140,7 +202,61 @@ for x in range(image.size[0]):
         c = []
         xyz = t[1]
         # r = np.random.random()
-        r = blueNoise[x, y][0] / 255.0
+        r = blueNoise[x % bns[0], y % bns[1]][0] / 255.0
+        i = 0
+        if r > xyz[0]:
+            r -= xyz[0]
+            if r > xyz[1]:
+                r -= xyz[1]
+                if r > xyz[2]:
+                    i = 3
+                else:
+                    i = 2
+            else:
+                i = 1
+        else:
+            i = 0
+        c = gamma(t[0].vertices[i].val.tolist())
+        # print(t[0].vertices[i].name)
+        newImage_b.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
+
+        r = np.random.random()
+        i = 0
+        if r > xyz[0]:
+            r -= xyz[0]
+            if r > xyz[1]:
+                r -= xyz[1]
+                if r > xyz[2]:
+                    i = 3
+                else:
+                    i = 2
+            else:
+                i = 1
+        else:
+            i = 0
+        c = gamma(t[0].vertices[i].val.tolist())
+        newImage_w.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
+
+        r = ign(x, y)
+        i = 0
+        if r > xyz[0]:
+            r -= xyz[0]
+            if r > xyz[1]:
+                r -= xyz[1]
+                if r > xyz[2]:
+                    i = 3
+                else:
+                    i = 2
+            else:
+                i = 1
+        else:
+            i = 0
+        c = gamma(t[0].vertices[i].val.tolist())
+        newImage_ign.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
+        name = t[0].vertices[i].name
+        csv[y] += name.split("|")
+
+        r = bayer_d(x, y, 2)
         if r > xyz[0]:
             r -= xyz[0]
             if r > xyz[1]:
@@ -153,11 +269,15 @@ for x in range(image.size[0]):
                 c = gamma(t[0].vertices[1].val.tolist())
         else:
             c = gamma(t[0].vertices[0].val.tolist())
+        newImage_bay.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
+        # c = gamma((t[0].o + np.matmul(xyz, t[0].M)).tolist())
+    # print("\n")
+image.save("scaled_.png")
+newImage_w.save("outw.png")
+newImage_b.save("outb.png")
+newImage_ign.save("outign.png")
+newImage_bay.save("outbay.png")
 
-        # print(f"{(*t.o, 255)}  {color}")
-        casList = [int(v) for v in c]
-        # print(casList)
-        newImage.putpixel((x, y), (casList[0], casList[1], casList[2], 255))
-image.save("scaled.png")
-newImage.save("out.png")
-print("saved!")
+print("saved!\n")
+
+print(csv)

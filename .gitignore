@@ -1,0 +1,6 @@
+*
+!regex
+!*.*
+*.png
+*.jpg
+*.jpe
