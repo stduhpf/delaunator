@@ -41,6 +41,7 @@ def plotTetrahedron(t: Tetra, ax: Axes, ignore: list[Point] = []) -> None:
     tx = [
         mix(t.vert[0, 0], c[0]),
         mix(t.vert[1, 0], c[0]),
+        mix(t.vert[1, 0], c[0]),
         mix(t.vert[2, 0], c[0]),
         mix(t.vert[3, 0], c[0]),
         mix(t.vert[0, 0], c[0]),

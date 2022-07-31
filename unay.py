@@ -1,4 +1,5 @@
 from ast import arg
+from datetime import datetime
 from math import floor, sqrt
 import numpy as np
 
@@ -27,7 +28,6 @@ class Point:
         assert cc == hash("Called correctly")
         self.val = np.array([x, y, z])
         self.name: str = name
-        self.in_segments: list["Segment"] = []
         self.in_triangles: list["Triangle"] = []
         self.in_tetra: list["Tetra"] = []
         self.checked = False
@@ -46,87 +46,6 @@ class Point:
         return self.val[0] - other.val[0]
 
 
-class Segment:
-    _instances: list["Segment"] = []
-
-    @classmethod
-    def make(cls, start, end) -> "Segment":
-        try:
-            return [x for x in cls._instances if x.chkPoints(start, end)][0]
-        except (ValueError, IndexError):
-            new = cls(start, end, hash("Called correctly"))
-            cls._instances.append(new)
-            return new
-
-    def __init__(self, start: Point, end: Point, cc: int = 0) -> None:
-        assert cc == hash("Called correctly")
-        self.start = start
-        self.end = end
-        start.in_segments.append(self)
-        end.in_segments.append(self)
-
-        self.name = f"[{start} {end}]"
-
-        self.in_triangles: list["Triangle"] = []
-        self.in_tetra: list["Tetra"] = []
-
-        self.checked = False
-
-    def __repr__(self) -> str:
-        if self.name is None:
-            return object.__repr__(self)
-        return self.name
-
-    def __eq__(self, other: "Segment") -> bool:
-        return (self.start == other.start and self.end == other.end) or (
-            self.start == other.end and self.end == other.start
-        )
-
-    def chkPoints(self, start: Point, end: Point) -> bool:
-        return all(vertex in [self.start, self.end] for vertex in [start, end])
-
-    def contains(self, p: Point) -> bool:
-        return self.start == p or self.end == p
-
-    def disjoint(self, other: "Segment") -> bool:
-        return not self.contains(other.start) and not self.contains(other.end)
-
-    def complement(self, p: Point) -> Point:
-        assert self.contains(p), f"Point {p} cannot be found in segment {self}"
-        return self.end if p == self.start else self.start
-
-    def remove_tetra(self, t: "Tetra") -> None:
-        try:
-            self.in_tetra.remove(t)
-        except ValueError:
-            print(f"somehow removing {t} from {self} failed : {self.in_tetra}")
-        if len(self.in_tetra) + len(self.in_triangles) == 0:
-            self.discard()
-
-    def remove_triangle(self, t: "Triangle") -> None:
-        try:
-            self.in_triangles.remove(t)
-        except ValueError:
-            print(f"somehow removing {t} from {self} failed : {self.in_triangles}")
-        if len(self.in_tetra) + len(self.in_triangles) == 0:
-            self.discard()
-
-    def discard(self):
-        # print(f"discarding {self}")
-        try:
-            self.start.in_segments.remove(self)
-        except ValueError:
-            print(
-                f"somehow removing {self} from {self.start} failed : {self.start.in_segments}"
-            )
-        try:
-            self.end.in_segments.remove(self)
-        except ValueError:
-            print(
-                f"somehow removing {self} from {self.end} failed : {self.end.in_segments}"
-            )
-
-
 class Triangle:
     _instances: list["Triangle"] = []
 
@@ -141,13 +60,6 @@ class Triangle:
 
     def __init__(self, A: Point, B: Point, C: Point, cc: int = None) -> None:
         assert cc == hash("Called correctly")
-        self.segments: list[Segment] = [
-            Segment.make(A, B),
-            Segment.make(B, C),
-            Segment.make(C, A),
-        ]
-        for s in self.segments:
-            s.in_triangles.append(self)
 
         self.vertices: list[Point] = [A, B, C]
         for vertex in self.vertices:
@@ -169,14 +81,6 @@ class Triangle:
             return object.__repr__(self)
         return self.name
 
-    def complementS(self, s: Segment) -> Point:
-        assert s in self.segments
-        return [p for p in self.vertices if not s.contains(p)][0]
-
-    def complementP(self, p: Point) -> Segment:
-        assert p in self.vertices
-        return [s for s in self.segments if not s.contains(p)][0]
-
     def remove_tetra(self, t: "Tetra") -> None:
         try:
             self.in_tetra.remove(t)
@@ -194,8 +98,6 @@ class Triangle:
                 print(
                     f"somehow removing {self} from {vertex} failed : {vertex.in_triangles}"
                 )
-        for segment in self.segments:
-            segment.remove_triangle(self)
 
 
 class Tetra:
@@ -233,17 +135,6 @@ class Tetra:
         for t in self.triangles:
             t.in_tetra.append(self)
 
-        self.segments: list[Segment] = [
-            Segment.make(A, B),
-            Segment.make(A, C),
-            Segment.make(A, D),
-            Segment.make(B, C),
-            Segment.make(B, D),
-            Segment.make(C, D),
-        ]
-        for s in self.segments:
-            s.in_tetra.append(self)
-
         self.vertices: list[Point] = [A, B, C, D]
         for vertex in self.vertices:
             vertex.in_tetra.append(self)
@@ -266,11 +157,6 @@ class Tetra:
         assert t in self.triangles
         return [p for p in self.vertices if not p in t.vertices][0]
 
-    def complementS(self, seg: Segment) -> Segment:
-        assert seg in self.segments
-        ret = [s for s in self.segments if seg.disjoint(s)]
-        return ret[0]
-
     def complementP(self, p: Point) -> Triangle:
         assert p in self.vertices
         return [t for t in self.triangles if not p in t.vertices][0]
@@ -284,8 +170,6 @@ class Tetra:
                 print(
                     f"somehow removing {self} from {vertex} failed : {vertex.in_tetra}"
                 )
-        for segment in self.segments:
-            segment.remove_tetra(self)
         for triangle in self.triangles:
             triangle.remove_tetra(self)
 
@@ -343,21 +227,21 @@ def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
     containedFaces: list[Triangle] = []
     remainingFaces: list[Triangle] = []
     for tet in containers:
-        for f in tet.triangles:
-            if not f.checked:
-                f.checked = True
+        for face in tet.triangles:
+            if not face.checked:
+                face.checked = True
                 contained = False
-                for t in f.in_tetra:
+                for t in face.in_tetra:
                     if t != tet and t in containers:
-                        containedFaces.append(f)
+                        containedFaces.append(face)
                         contained = True
                         break
                 if not contained:
-                    remainingFaces.append(f)
+                    remainingFaces.append(face)
 
     for tet in containers:
-        for f in tet.triangles:
-            f.checked = False
+        for face in tet.triangles:
+            face.checked = False
 
     newTet: list[Tetra] = []
     for face in remainingFaces:
@@ -518,6 +402,7 @@ def findLocalTetra(
 
 
 def run(points: list[tuple[str, list[float]]]) -> list:
+    t0 = datetime.now()
     bigT: Tetra = Tetra(
         Point.make(0.0, 0.0, 100000000.0, "0"),
         Point.make(-200000000.0 * sqrt(2) / 3.0, 00000000.0, -100000000.0 / 3.0, "1"),
@@ -540,11 +425,12 @@ def run(points: list[tuple[str, list[float]]]) -> list:
     bigTVert = bigT.vertices
 
     tetrahedrization = [bigT]
-
     for p in points:
         tetrahedrization = addPoint(
             tetrahedrization,
             Point.make(*(p[1]), p[0]),
         )
+
+    print(f"Execution time: {datetime.now()- t0}")
 
     return tetrahedrization
