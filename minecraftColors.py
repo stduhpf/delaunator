@@ -222,29 +222,29 @@ for y in range(image.size[1]):
         c = []
         xyz = t[1]
         r = 1.-xyz[0]-xyz[1]-xyz[2]
-        while(min(xyz[0],xyz[1],xyz[2],r)<offset):
-            m = min(xyz[0],xyz[1],xyz[2],r)
+        while   min(xyz[0], xyz[1], xyz[2], r) < offset:
+            m = min(xyz[0], xyz[1], xyz[2], r)
             d = 1 - m
-            if(m==xyz[0]):
-                xyz[1]+=xyz[0]*xyz[1]/d
-                xyz[2]+=xyz[0]*xyz[2]/d
-                r     +=xyz[0]*r     /d
+            if m == xyz[0]:
+                xyz[1] += xyz[0]*xyz[1]/d
+                xyz[2] += xyz[0]*xyz[2]/d
+                r      += xyz[0]*r     /d
                 xyz[0] = 2
-            elif(m==xyz[1]):
-                xyz[0]+=xyz[1]*xyz[0]/d
-                xyz[2]+=xyz[1]*xyz[2]/d
-                r     +=xyz[1]*r     /d
+            elif m == xyz[1]:
+                xyz[0] += xyz[1]*xyz[0]/d
+                xyz[2] += xyz[1]*xyz[2]/d
+                r      += xyz[1]*r     /d
                 xyz[1] = 2
-            elif(m==xyz[2]):
-                xyz[0]+=xyz[2]*xyz[0]/d
-                xyz[1]+=xyz[2]*xyz[1]/d
-                r     +=xyz[2]*r     /d
+            elif m == xyz[2]:
+                xyz[0] += xyz[2]*xyz[0]/d
+                xyz[1] += xyz[2]*xyz[1]/d
+                r      += xyz[2]*r     /d
                 xyz[2] = 2
             else:
-                xyz[0]+=r     *xyz[0]/d
-                xyz[1]+=r     *xyz[1]/d
-                xyz[2]+=r     *xyz[2]/d
-                r=2
+                xyz[0] += r     *xyz[0]/d
+                xyz[1] += r     *xyz[1]/d
+                xyz[2] += r     *xyz[2]/d
+                r      = 2 
         xyz = [0 if v > 1 else v for v in xyz]
         r = (blueNoise[x % bns[0], y % bns[1]][0] + 0.5) / 256.0
         i = 0

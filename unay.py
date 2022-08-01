@@ -365,7 +365,8 @@ def findLocalTetra(
     ]
     valid = all(t in range(8) for t in tc)
     if valid:
-        for t in tree[tc[0]][tc[1]][tc[2]]:
+        for T in tree[tc[0]][tc[1]][tc[2]]:
+            t : Tetra = T
             c = coordsInTetra(point, t)
             if c[1]:
                 lastUsed = t
