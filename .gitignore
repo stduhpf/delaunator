@@ -1,6 +1,7 @@
 *
 !regex
 !*.*
+!tests/lena_std.tif
 *.png
 *.jpg
 *.jpe
