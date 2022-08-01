@@ -6,10 +6,13 @@ import numpy as np
 Sphere = tuple[np.ndarray, float]
 
 bigTVert = []
+triBuffer: list["Triangle"] = []
+vertexCount = 0
 
 
 class Point:
     _instances: list["Point"] = []
+    _count = 0
 
     @classmethod
     def make(cls, x, y, z, name=None) -> "Point":
@@ -26,6 +29,8 @@ class Point:
 
     def __init__(self, x, y, z, name: str = None, cc: int = 0) -> None:
         assert cc == hash("Called correctly")
+        self.id = Point._count
+        Point._count += 1
         self.val = np.array([x, y, z])
         self.name: str = name
         self.in_triangles: list["Triangle"] = []
@@ -45,59 +50,33 @@ class Point:
             return self.val[1] - other.val[1]
         return self.val[0] - other.val[0]
 
+    def __lt__(self, other: "Point"):
+        return self.__cmp__(other) < 0
+
 
 class Triangle:
-    _instances: list["Triangle"] = []
-
     @classmethod
     def make(cls, A: Point, B: Point, C: Point) -> "Triangle":
-        try:
-            return [x for x in cls._instances if x.chkPoints(A, B, C)][0]
-        except (ValueError, IndexError):
-            new = cls(A, B, C, hash("Called correctly"))
-            cls._instances.append(new)
-            return new
+        global triBuffer
+        global vertexCount
+        pts = [A, B, C]
+        pts.sort()
+        [a, b, c] = pts
+        index = a.id + b.id * vertexCount + c.id * vertexCount * vertexCount
+        tri = triBuffer[index]
+        tri.vertices = pts
+        return tri
 
-    def __init__(self, A: Point, B: Point, C: Point, cc: int = None) -> None:
-        assert cc == hash("Called correctly")
-
-        self.vertices: list[Point] = [A, B, C]
-        for vertex in self.vertices:
-            vertex.in_triangles.append(self)
-
-        self.name: str = "{" + f"{A} {B} {C}" + "}"
+    def __init__(self):
         self.in_tetra: list["Tetra"] = []
-
+        self.vertices: list[Point] = []
         self.checked = False
-
-    def __eq__(self, other: "Triangle") -> bool:
-        return all(vertex in self.vertices for vertex in other.vertices)
-
-    def chkPoints(self, A: Point, B: Point, C: Point) -> bool:
-        return all(vertex in self.vertices for vertex in [A, B, C])
-
-    def __repr__(self) -> str:
-        if self.name is None:
-            return object.__repr__(self)
-        return self.name
 
     def remove_tetra(self, t: "Tetra") -> None:
         try:
             self.in_tetra.remove(t)
         except ValueError:
             print(f"somehow removing {t} from {self} failed : {self.in_tetra}")
-        if len(self.in_tetra) == 0:
-            self.discard()
-
-    def discard(self):
-        # print(f"discarding {self}")
-        for vertex in self.vertices:
-            try:
-                vertex.in_triangles.remove(self)
-            except ValueError:
-                print(
-                    f"somehow removing {self} from {vertex} failed : {vertex.in_triangles}"
-                )
 
 
 class Tetra:
@@ -126,6 +105,7 @@ class Tetra:
     def __init__(
         self, A: Point, B: Point, C: Point, D: Point, name: str = None
     ) -> None:
+        self.isContainer = False
         self.triangles: list[Triangle] = [
             Triangle.make(A, B, C),
             Triangle.make(A, B, D),
@@ -224,7 +204,7 @@ def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
     for tet in tetrahedrization:
         if pointInBoundSphere(point, tet):
             containers.append(tet)
-    containedFaces: list[Triangle] = []
+            tet.isContainer = True
     remainingFaces: list[Triangle] = []
     for tet in containers:
         for face in tet.triangles:
@@ -232,8 +212,7 @@ def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
                 face.checked = True
                 contained = False
                 for t in face.in_tetra:
-                    if t != tet and t in containers:
-                        containedFaces.append(face)
+                    if t != tet and t.isContainer:
                         contained = True
                         break
                 if not contained:
@@ -242,14 +221,11 @@ def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
     for tet in containers:
         for face in tet.triangles:
             face.checked = False
+        tetrahedrization.remove(tet)
 
-    newTet: list[Tetra] = []
     for face in remainingFaces:
         t = Tetra.make(point, *face.vertices)
-        newTet.append(t)
-    tetrahedrization = [
-        tet for tet in tetrahedrization if not tet in containers
-    ] + newTet
+        tetrahedrization.append(t)
 
     for tet in containers:
         tet.discard()
@@ -403,6 +379,12 @@ def findLocalTetra(
 
 def run(points: list[tuple[str, list[float]]]) -> list:
     t0 = datetime.now()
+
+    global triBuffer
+    global vertexCount
+    vertexCount = len(points) + 4
+    triBuffer = [Triangle() for _ in range(vertexCount * vertexCount * vertexCount)]
+
     bigT: Tetra = Tetra(
         Point.make(0.0, 0.0, 100000000.0, "0"),
         Point.make(-200000000.0 * sqrt(2) / 3.0, 00000000.0, -100000000.0 / 3.0, "1"),
