@@ -1,4 +1,3 @@
-from ast import arg
 from datetime import datetime
 from math import floor, sqrt
 import numpy as np
@@ -199,8 +198,10 @@ def pointInBoundSphere(point: Point, tetrahedron: Tetra) -> bool:
     return pointInSphere(point, tetrahedron.boundingSphere)
 
 
+
 def addPoint(tetrahedrization: list[Tetra], point: Point) -> list[Tetra]:
     containers: list[Tetra] = []
+
     for tet in tetrahedrization:
         if pointInBoundSphere(point, tet):
             containers.append(tet)
@@ -247,7 +248,8 @@ def point_name(i: int):
 def coordsInTetra(point: Point, tetra: Tetra) -> tuple[np.ndarray, bool]:
     loc = point.val - tetra.o
     c = np.matmul(loc, tetra.iM)
-    return (c, (c > -5.0e-08).all() and np.dot(c, [1, 1, 1]) < 1 + 5e-08)
+    error_margin = 1e-08
+    return (c, (c + error_margin >= 0).all() and np.dot(c - error_margin, [1, 1, 1]) <= 1)
 
 
 tree: list[list[list[Tetra]]] = [
@@ -339,7 +341,7 @@ def fract(x):
     return x - floor(x)
 
 
-def vtoi(*args):
+def vtoi(*args) -> int:
     if len(args) == 0:
         return 0
     return int(fract(args[0]) > 0.5) + 2 * vtoi(*args[1:])
@@ -355,10 +357,11 @@ def findLocalTetra(
         c = coordsInTetra(point, lastUsed)
         if c[1]:
             return (lastUsed, lastUsed.removeVertexFromCoords(c[0], bigTVert))
+    val  = point.val + np.array([0, 0.5, 0.5])
     tc = [
-        vtoi(*(point.val / 65025.0).tolist()),
-        vtoi(*(point.val * 0.5 / 65025.0).tolist()),
-        vtoi(*(point.val * 0.25 / 65025.0).tolist()),
+        vtoi(*(val     ).tolist()),
+        vtoi(*(val*0.5 ).tolist()),
+        vtoi(*(val*0.25).tolist()),
     ]
     valid = all(t in range(8) for t in tc)
     if valid:
@@ -367,6 +370,9 @@ def findLocalTetra(
             if c[1]:
                 lastUsed = t
                 return (t, t.removeVertexFromCoords(c[0], bigTVert))
+    else:
+        print(f'invalid: {tc}')
+    
     for t in tetrahedrization:
         c = coordsInTetra(point, t)
         if c[1]:
@@ -386,20 +392,10 @@ def run(points: list[tuple[str, list[float]]]) -> list:
     triBuffer = [Triangle() for _ in range(vertexCount * vertexCount * vertexCount)]
 
     bigT: Tetra = Tetra(
-        Point.make(0.0, 0.0, 100000000.0, "0"),
-        Point.make(-200000000.0 * sqrt(2) / 3.0, 00000000.0, -100000000.0 / 3.0, "1"),
-        Point.make(
-            200000000.0 * sqrt(2) / 6.0,
-            100000000.0 * sqrt(2.0 / 3.0),
-            -100000000.0 / 3.0,
-            "2",
-        ),
-        Point.make(
-            200000000.0 * sqrt(2) / 6.0,
-            -100000000.0 * sqrt(2.0 / 3.0),
-            -100000000.0 / 3.0,
-            "3",
-        ),
+        Point.make( 100000.0      ,  0.0                     ,  0.0                       , "0"),                                                           
+        Point.make(-100000.0 / 3.0, -200000.0 * sqrt(2) / 3.0,  0.0                       , "1"),                                
+        Point.make(-100000.0 / 3.0,  200000.0 * sqrt(2) / 6.0,  100000.0 * sqrt(2.0 / 3.0), "2"), 
+        Point.make(-100000.0 / 3.0,  200000.0 * sqrt(2) / 6.0, -100000.0 * sqrt(2.0 / 3.0), "3"),
     )
 
     global bigTVert

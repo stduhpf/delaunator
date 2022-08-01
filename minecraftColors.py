@@ -3,7 +3,6 @@ from PIL import Image
 import numpy as np
 
 from unay import Point, findLocalTetra, run
-import matplotlib.pyplot as plt
 
 # TODO: gamma correction, color spaces, accelerating structure
 
@@ -118,7 +117,7 @@ def bayer_d(x: int, y: int, level: int) -> float:
 
 
 def gammaInv(col: list[float]) -> list[float]:
-    return rgb2ycocg([pow(c, 2.2) for c in col])
+    return rgb2ycocg([pow(c / 255.0, 2.2) for c in col])
 
 
 def rgb2ycocg(col: list[float]) -> list[float]:
@@ -131,7 +130,7 @@ def rgb2ycocg(col: list[float]) -> list[float]:
 
 def gamma(col: list[float]) -> list[float]:
     col = ycocg2rgb(col)
-    return [pow(max(c, 0), 1.0 / 2.2) for c in col]
+    return [pow(max(c, 0), 1.0 / 2.2)*255.0 for c in col]
 
 
 def ycocg2rgb(col: list[float]) -> list[float]:
@@ -159,11 +158,7 @@ for (i, m) in enumerate(multipliers):
         (
             c[0] + "|" + str(i),
             gammaInv(
-                [
-                    c[1][0] * m,
-                    c[1][1] * m,
-                    c[1][2] * m,
-                ]
+                [float(ch) * m for ch in c[1]]
             ),
         )
         for c in colors.items()
@@ -172,7 +167,7 @@ for (i, m) in enumerate(multipliers):
 
 palette = run(colorList)
 
-print("palette generated")
+print(f'palette generated, {len(palette)} cells')
 # exit()
 
 # ax = plt.axes(projection="3d")
@@ -221,7 +216,7 @@ for y in range(image.size[1]):
         p = Point.make(color[0], color[1], color[2])
         t = findLocalTetra(p, palette)
         if t is None:
-            print(f"impossible color {color}, {t}")
+            print(f"impossible color { gamma(color) }, {t}")
             newImageData.append((0, 0, 0, 0))
             continue
         c = []
@@ -302,8 +297,8 @@ for y in range(image.size[1]):
             i = 0
         c = gamma(t[0].vertices[i].val.tolist())
         newImage_ign.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
-        name = t[0].vertices[i].name
-        csv[y] += name.split("|")
+        # name = t[0].vertices[i].name
+        # csv[y] += name.split("|")
 
         r = bayer_d(x, y, 7)
         if r > xyz[0]:
