@@ -4,6 +4,7 @@ import numpy as np
 
 from unay import Point, findLocalTetra, run
 
+
 # TODO: gamma correction, color spaces, accelerating structure
 
 colors = {
@@ -75,19 +76,37 @@ multipliers = [0.71, 0.86, 1.0]
 
 # multipliers = [0.86]
 
-# TODO: Use CIELUV for closest color matching
+def f(t: float) -> float:
+    return pow(t, 1/3) if (t > pow(6/29, 3)) else 1/3*(29/6)*(29/6) * t + 4/29
+
+def yCoCg2cieLab(col: list[float]) -> list[float]:
+    # ycocgToRGB = np.transpose(np.matrix([[1, 1,-1],
+                                        #  [1, 0, 1],
+                                        #  [1,-1,-1]]))
+    RGBToXYZ = (np.matrix([[0.4124, 0.2126, 0.0193], 
+                           [0.3576, 0.7152, 0.1192],
+                           [0.1805, 0.0722, 0.9505]]))
+    # print(ycocg2rgb(col))
+    # print(np.matmul(np.array(col),ycocgToRGB).tolist())
+    # print()
+    col = np.matmul(np.array(ycocg2rgb(col)),RGBToXYZ).tolist()[0]
+
+    return [116 * f(col[0]/100) - 16, 500 * (f(col[1]/95.0489) - f(col[0]/100)),200 * (f(col[0]/100) - f(col[2]/108.8840))]
+
 def closestColor(
     colorList: list[tuple[str, list[float]]], color: list[float]
 ) -> list[float]:
+    labColor = yCoCg2cieLab(color)
     col = colorList[0][1]
     md = 100000.0
 
-    for (_, c) in colorList:
-        dx = color[0] - c[0]
-        dy = color[1] - c[1]
-        dz = color[2] - c[2]
+    for (_, c, labc) in colorList:
+        dx = labColor[0] - labc[0]
+        dy = labColor[1] - labc[1]
+        dz = labColor[2] - labc[2]
         d = sqrt(dx * dx + dy * dy + dz * dz)
         if d < md:
+            # print(f'{col}->{c} ({labColor}->{labc})')
             col = c
             md = d
     return col
@@ -199,6 +218,25 @@ newImage_close = Image.new(image.mode, image.size)
 csv = []
 
 offset = 0
+
+labcolors = [(n, c, yCoCg2cieLab(c)) for (n, c) in colorList]
+
+for y in range(image.size[1]):
+    for x in range(image.size[0]):
+        # X = x / image.size[0]
+        # color = gammaInv(
+        #     [
+        #         200 * X + 150 * (1.0 - X),
+        #         25 * X + 160 * (1.0 - X),
+        #         190 * X + 255 * (1.0 - X),
+        #     ]
+        # )
+        color = gammaInv([float(p) for p in pixels[x, y]])
+        c = gamma(closestColor(labcolors, color))
+        newImage_close.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
+
+newImage_close.save("out_close.png")
+print('saved closest')
 
 for y in range(image.size[1]):
     csv.append([])
@@ -315,8 +353,6 @@ for y in range(image.size[1]):
             c = gamma(t[0].vertices[0].val.tolist())
         newImage_bay.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
 
-        c = gamma(closestColor(colorList, color))
-        newImage_close.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
         # c = gamma((t[0].o + np.matmul(xyz, t[0].M)).tolist())
     # print("\n")
 image.save(         "scaled_.png"  )
@@ -324,7 +360,6 @@ newImage_w.save(    "outw.png"     )
 newImage_b.save(    "outb.png"     )
 newImage_ign.save(  "outign.png"   )
 newImage_bay.save(  "outbay.png"   )
-newImage_close.save("out_close.png")
 
 print("saved!\n")
 
