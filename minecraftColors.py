@@ -191,7 +191,7 @@ def ign(x, y):
     return fract(52.9829189 * fract(0.06711056 * float(x) + 0.00583715 * float(y)))
 
 
-image = Image.open("tests/jojokerker.PNG").resize((128, 128))
+image = Image.open("tests/lena_std.tif").resize((128, 128))
 
 
 colorList = []
