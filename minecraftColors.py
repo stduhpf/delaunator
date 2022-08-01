@@ -76,37 +76,58 @@ multipliers = [0.71, 0.86, 1.0]
 
 # multipliers = [0.86]
 
-def f(t: float) -> float:
-    return pow(t, 1/3) if (t > pow(6/29, 3)) else 1/3*(29/6)*(29/6) * t + 4/29
+
 
 def yCoCg2cieLab(col: list[float]) -> list[float]:
-    # ycocgToRGB = np.transpose(np.matrix([[1, 1,-1],
-                                        #  [1, 0, 1],
-                                        #  [1,-1,-1]]))
     RGBToXYZ = (np.matrix([[0.4124, 0.2126, 0.0193], 
                            [0.3576, 0.7152, 0.1192],
                            [0.1805, 0.0722, 0.9505]]))
-    # print(ycocg2rgb(col))
-    # print(np.matmul(np.array(col),ycocgToRGB).tolist())
-    # print()
+
     col = np.matmul(np.array(ycocg2rgb(col)),RGBToXYZ).tolist()[0]
 
-    return [116 * f(col[0]/100) - 16, 500 * (f(col[1]/95.0489) - f(col[0]/100)),200 * (f(col[0]/100) - f(col[2]/108.8840))]
+    def f(t: float) -> float:
+        return pow(t, 1/3) if (t > pow(6/29, 3)) else 1/3*(29/6)*(29/6) * t + 4/29
+
+    w = [95.0489,100,108.8840]
+
+    return [116 * f(col[1]/w[1]) - 16, 500 * (f(col[0]/w[0]) - f(col[1]/w[1])),200 * (f(col[1]/w[1]) - f(col[2]/w[2]))]
+
+
+def yCoCg2cieLuv(col: list[float]) -> list[float]:
+
+    RGBToXYZ = (np.matrix([[0.4124, 0.2126, 0.0193], 
+                           [0.3576, 0.7152, 0.1192],
+                           [0.1805, 0.0722, 0.9505]]))
+
+    col = np.matmul(np.array(ycocg2rgb(col)),RGBToXYZ).tolist()[0]
+
+    def f(t: float) -> float:
+        return pow(t, 1/3) if (t > pow(6/29, 3)) else 1/3*(29/6)*(29/6) * t + 4/29
+
+    w = [95.0489,100,108.8840]
+    L = 116*f(col[1]/w[2])-16
+    u = 4*col[0]/(col[0]+15*col[1]+3*col[2])
+    u0 = 4*w[0]/(w[0]+15*w[1]+3*w[2])
+    v = 9*col[1]/(col[0]+15*col[1]+3*col[2])
+    v0 = 9*w[1]/(w[0]+15*w[1]+3*w[2])
+
+
+    return [L, 13*L*(u-u0), 13*L*(v-v0)]
 
 def closestColor(
     colorList: list[tuple[str, list[float]]], color: list[float]
 ) -> list[float]:
-    labColor = yCoCg2cieLab(color)
+    luvColor = yCoCg2cieLuv(color)
     col = colorList[0][1]
     md = 100000.0
 
-    for (_, c, labc) in colorList:
-        dx = labColor[0] - labc[0]
-        dy = labColor[1] - labc[1]
-        dz = labColor[2] - labc[2]
+    for (_, c, luvc) in colorList:
+        dx = luvColor[0] - luvc[0]
+        dy = luvColor[1] - luvc[1]
+        dz = luvColor[2] - luvc[2]
         d = sqrt(dx * dx + dy * dy + dz * dz)
         if d < md:
-            # print(f'{col}->{c} ({labColor}->{labc})')
+            # print(f'{col}->{c} ({luvColor}->{luvc})')
             col = c
             md = d
     return col
@@ -219,7 +240,7 @@ csv = []
 
 offset = 0
 
-labcolors = [(n, c, yCoCg2cieLab(c)) for (n, c) in colorList]
+luvcolors = [(n, c, yCoCg2cieLuv(c)) for (n, c) in colorList]
 
 for y in range(image.size[1]):
     for x in range(image.size[0]):
@@ -232,7 +253,7 @@ for y in range(image.size[1]):
         #     ]
         # )
         color = gammaInv([float(p) for p in pixels[x, y]])
-        c = gamma(closestColor(labcolors, color))
+        c = gamma(closestColor(luvcolors, color))
         newImage_close.putpixel((x, y), (int(c[0]), int(c[1]), int(c[2]), 255))
 
 newImage_close.save("out_close.png")
