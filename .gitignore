@@ -5,3 +5,5 @@
 *.png
 *.jpg
 *.jpe
+.vscode
+__pycache__
