@@ -6,8 +6,9 @@ import numpy as np
 
 from unay import Point, findLocalTetra, run
 
+# TODO implement NBT abd schematic generation from https://github.com/rebane2001/mapartcraft
 
-# TODO: gamma correction, color spaces, accelerating structure
+# TODO: accelerating structures
 
 colors = {
     "GRASS":                  [127, 178, 56 ],
